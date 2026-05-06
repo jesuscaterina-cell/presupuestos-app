@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { margin: 0 0 15px 0; color: #333; }
+        .currency-select {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .currency-select label { font-weight: 600; }
+        .currency-select select {
+            padding: 8px 12px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            margin: 0 0 15px 0;
+            color: #444;
+            font-size: 18px;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th { color: #666; font-weight: 600; font-size: 14px; }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input[type="text"] { width: 100%; }
+        input[type="number"] { width: 80px; text-align: right; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .btn-add {
+            background: #4CAF50;
+            color: white;
+            margin-top: 10px;
+        }
+        .btn-add:hover { background: #45a049; }
+        .btn-delete {
+            background: #f44336;
+            color: white;
+            padding: 4px 8px;
+        }
+        .btn-delete:hover { background: #da190b; }
+        .btn-pdf {
+            background: #2196F3;
+            color: white;
+            margin-left: auto;
+        }
+        .btn-pdf:hover { background: #1976D2; }
+        .totals {
+            background: #333;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        .totals-row.total {
+            border-top: 1px solid #555;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 8px;
+            padding-top: 16px;
+        }
+        .iva-note {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="doc-title" value="PRESUPUESTO" style="font-size: 24px; font-weight: bold; border: none; border-bottom: 2px solid #333; padding: 5px; width: 300px;">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">Logo de Empresa</label>
+                <input type="file" id="company-logo" accept="image/*" onchange="previewLogo()" style="width: 100%;">
+            </div>
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">Nombre de la Empresa</label>
+                <input type="text" id="company-name" placeholder="Nombre de tu empresa" style="width: 100%;">
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">Cliente</label>
+                <input type="text" id="client-name" placeholder="Nombre del cliente">
+            </div>
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">RIF/CI</label>
+                <input type="text" id="client-rif" placeholder="RIF o Cédula">
+            </div>
+            <div>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">Teléfono</label>
+                <input type="text" id="client-phone" placeholder="Teléfono">
+            </div>
+        </div>
+        <div>
+            <label style="display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px;">Dirección</label>
+            <input type="text" id="client-address" placeholder="Dirección del cliente">
+        </div>
+        <div class="currency-select" style="margin-top: 15px;">
+            <label>Moneda:</label>
+            <select id="currency" onchange="calculateTotals()">
+                <option value="VES">Bolivares (Bs.)</option>
+                <option value="USD">Dólares (USD)</option>
+            </select>
+            <label style="display: flex; align-items: center; gap: 5px; margin-left: 15px;">
+                <input type="checkbox" id="apply-iva" checked onchange="calculateTotals()">
+                <span style="font-weight: 600;">Aplicar IVA (16%)</span>
+            </label>
+            <button class="btn btn-pdf" onclick="exportPDF()">Descargar PDF</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Equipos</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%">Descripción</th>
+                    <th style="width: 20%">Cantidad</th>
+                    <th style="width: 20%">Precio Unit.</th>
+                    <th style="width: 20%">Total</th>
+                </tr>
+            </thead>
+            <tbody id="equipment-list"></tbody>
+        </table>
+        <button class="btn btn-add" onclick="addEquipmentRow()">+ Agregar Equipo</button>
+    </div>
+
+    <div class="section">
+        <h2>Mano de Obra</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40%">Descripción</th>
+                    <th style="width: 20%">Cantidad</th>
+                    <th style="width: 20%">Precio Unit.</th>
+                    <th style="width: 20%">Total</th>
+                </tr>
+            </thead>
+            <tbody id="labor-list"></tbody>
+        </table>
+        <button class="btn btn-add" onclick="addLaborRow()">+ Agregar Mano de Obra</button>
+    </div>
+
+    <div class="totals">
+        <div class="totals-row">
+            <span>Subtotal:</span>
+            <span id="subtotal">0,00</span>
+        </div>
+        <div class="totals-row" id="iva-row">
+            <span>IVA (16%):</span>
+            <span id="iva">0,00</span>
+        </div>
+        <div class="iva-note" id="iva-note"></div>
+        <div class="totals-row total">
+            <span>Total:</span>
+            <span id="total">0,00</span>
+        </div>
+    </div>
+
+    <script>
+        let equipmentCount = 0;
+        let laborCount = 0;
+        let logoDataUrl = null;
+
+        function formatNumber(num) {
+            return num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function previewLogo() {
+            const input = document.getElementById('company-logo');
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    logoDataUrl = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function addEquipmentRow() {
+            equipmentCount++;
+            const tbody = document.getElementById('equipment-list');
+            const row = document.createElement('tr');
+            row.id = `equipment-${equipmentCount}`;
+            row.innerHTML = `
+                <td><input type="text" placeholder="Descripción del equipo"></td>
+                <td><input type="number" min="1" value="1" onchange="calculateTotals()"></td>
+                <td><input type="number" min="0" step="0.01" value="0" onchange="calculateTotals()"></td>
+                <td><span class="row-total">0,00</span> <button class="btn btn-delete" onclick="deleteRow('equipment-${equipmentCount}')">×</button></td>
+            `;
+            tbody.appendChild(row);
+            addInputListeners(row);
+        }
+
+        function addLaborRow() {
+            laborCount++;
+            const tbody = document.getElementById('labor-list');
+            const row = document.createElement('tr');
+            row.id = `labor-${laborCount}`;
+            row.innerHTML = `
+                <td><input type="text" placeholder="Descripción del trabajo"></td>
+                <td><input type="number" min="1" value="1" onchange="calculateTotals()"></td>
+                <td><input type="number" min="0" step="0.01" value="0" onchange="calculateTotals()"></td>
+                <td><span class="row-total">0,00</span> <button class="btn btn-delete" onclick="deleteRow('labor-${laborCount}')">×</button></td>
+            `;
+            tbody.appendChild(row);
+            addInputListeners(row);
+        }
+
+        function addInputListeners(row) {
+            const inputs = row.querySelectorAll('input[type="number"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', calculateTotals);
+            });
+        }
+
+        function deleteRow(id) {
+            document.getElementById(id).remove();
+            calculateTotals();
+        }
+
+        function calculateTotals() {
+            const currency = document.getElementById('currency').value;
+            const symbol = currency === 'VES' ? 'Bs.' : '$';
+            const applyIva = document.getElementById('apply-iva').checked;
+            
+            let subtotal = 0;
+
+            document.querySelectorAll('#equipment-list tr, #labor-list tr').forEach(row => {
+                const inputs = row.querySelectorAll('input[type="number"]');
+                const quantity = parseFloat(inputs[0]?.value || 0);
+                const unitPrice = parseFloat(inputs[1]?.value || 0);
+                const total = quantity * unitPrice;
+                
+                const totalSpan = row.querySelector('.row-total');
+                if (totalSpan) {
+                    totalSpan.textContent = formatNumber(total);
+                }
+                
+                subtotal += total;
+            });
+
+            const iva = (currency === 'VES' && applyIva) ? subtotal * 0.16 : 0;
+            const total = subtotal + iva;
+
+            document.getElementById('subtotal').textContent = `${symbol} ${formatNumber(subtotal)}`;
+            
+            const ivaRow = document.getElementById('iva-row');
+            const ivaNote = document.getElementById('iva-note');
+            
+            if (currency === 'VES' && applyIva) {
+                ivaRow.style.display = 'flex';
+                document.getElementById('iva').textContent = `${symbol} ${formatNumber(iva)}`;
+                ivaNote.textContent = 'IVA aplicado (16%)';
+            } else {
+                ivaRow.style.display = 'none';
+                ivaNote.textContent = currency === 'VES' ? 'IVA no aplicado' : 'Sin IVA (moneda extranjera)';
+            }
+            
+            document.getElementById('total').textContent = `${symbol} ${formatNumber(total)}`;
+        }
+
+        addEquipmentRow();
+        addLaborRow();
+
+        function exportPDF() {
+            const currency = document.getElementById('currency').value;
+            const symbol = currency === 'VES' ? 'Bs.' : '$';
+            const now = new Date();
+            const applyIva = document.getElementById('apply-iva').checked;
+            const docTitle = document.getElementById('doc-title').value || 'PRESUPUESTO';
+            
+            const companyName = document.getElementById('company-name').value || 'Empresa';
+            const clientName = document.getElementById('client-name').value || 'Cliente';
+            const clientRif = document.getElementById('client-rif').value || '';
+            const clientPhone = document.getElementById('client-phone').value || '';
+            const clientAddress = document.getElementById('client-address').value || '';
+            
+            let subtotal = 0;
+            let equipmentRowsHTML = '';
+            let laborRowsHTML = '';
+            
+            document.querySelectorAll('#equipment-list tr').forEach(row => {
+                const ti = row.querySelectorAll('input[type="text"]');
+                const ni = row.querySelectorAll('input[type="number"]');
+                const desc = ti[0]?.value || '';
+                const qty = parseFloat(ni[0]?.value || 1);
+                const price = parseFloat(ni[1]?.value || 0);
+                if (desc && price > 0) {
+                    const t = qty * price;
+                    subtotal += t;
+                    equipmentRowsHTML += `<tr><td style="padding:8px;border:1px solid #ddd;">${desc}</td><td style="padding:8px;border:1px solid #ddd;text-align:center;">${qty}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${symbol} ${formatNumber(price)}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${symbol} ${formatNumber(t)}</td></tr>`;
+                }
+            });
+            
+            document.querySelectorAll('#labor-list tr').forEach(row => {
+                const ti = row.querySelectorAll('input[type="text"]');
+                const ni = row.querySelectorAll('input[type="number"]');
+                const desc = ti[0]?.value || '';
+                const qty = parseFloat(ni[0]?.value || 1);
+                const price = parseFloat(ni[1]?.value || 0);
+                if (desc && price > 0) {
+                    const t = qty * price;
+                    subtotal += t;
+                    laborRowsHTML += `<tr><td style="padding:8px;border:1px solid #ddd;">${desc}</td><td style="padding:8px;border:1px solid #ddd;text-align:center;">${qty}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${symbol} ${formatNumber(price)}</td><td style="padding:8px;border:1px solid #ddd;text-align:right;">${symbol} ${formatNumber(t)}</td></tr>`;
+                }
+            });
+            
+            const iva = (currency === 'VES' && applyIva) ? subtotal * 0.16 : 0;
+            const total = subtotal + iva;
+            
+            const logoImg = logoDataUrl ? `<img src="${logoDataUrl}" style="max-width:150px;max-height:80px;">` : '';
+            const showIva = currency === 'VES' && applyIva;
+            const ivaNote = showIva ? '' : (currency === 'VES' ? 'Sin IVA' : 'Sin IVA (moneda extranjera)');
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Presupuesto</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: 0 auto; }
+                        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                        th { background: #f5f5f5; padding: 8px; text-align: left; border: 1px solid #ddd; font-weight: 600; }
+                        td { padding: 8px; border: 1px solid #ddd; }
+                        .header-table { width: 100%; margin-bottom: 20px; }
+                        .client-box { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+                        .totals-box { margin-top: 20px; padding: 20px; background: #333; color: white; border-radius: 8px; }
+                        .totals-row { display: flex; justify-content: space-between; padding: 5px 0; }
+                        .total-row { border-top: 1px solid #555; padding-top: 10px; margin-top: 10px; font-weight: bold; font-size: 18px; }
+                        hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+                        h2, h3 { color: #333; }
+                        @media print {
+                            body { max-width: 100%; }
+                            button { display: none; }
+                        }
+                    </style>
+                </head>
+<body>
+    <div id="main-content">
+                    <table class="header-table">
+                        <tr>
+                            <td style="vertical-align:top;">${logoImg}</td>
+                            <td style="text-align:right;vertical-align:top;">
+                                <div style="font-weight:bold;font-size:18px;color:#333;">${companyName}</div>
+                                <div style="color:#666;font-size:14px;">Fecha: ${now.toLocaleDateString('es-VE')}</div>
+                            </td>
+                        </tr>
+                    </table>
+                    <div class="client-box">
+                        <div style="font-weight:bold;margin-bottom:8px;">DATOS DEL CLIENTE</div>
+                        <div><strong>Cliente:</strong> ${clientName}</div>
+                        ${clientRif ? `<div><strong>RIF/CI:</strong> ${clientRif}</div>` : ''}
+                        ${clientPhone ? `<div><strong>Teléfono:</strong> ${clientPhone}</div>` : ''}
+                        ${clientAddress ? `<div><strong>Dirección:</strong> ${clientAddress}</div>` : ''}
+                    </div>
+                    <hr>
+                    <h2>${docTitle}</h2>
+                    ${equipmentRowsHTML ? '<h3>EQUIPOS</h3><table><tr><th>Descripción</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr>' + equipmentRowsHTML + '</table>' : ''}
+                    ${laborRowsHTML ? '<h3>MANO DE OBRA</h3><table><tr><th>Descripción</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Total</th></tr>' + laborRowsHTML + '</table>' : ''}
+                    <div class="totals-box">
+                        <div class="totals-row"><span>Subtotal:</span><span>${symbol} ${formatNumber(subtotal)}</span></div>
+                        ${showIva ? `<div class="totals-row"><span>IVA (16%):</span><span>${symbol} ${formatNumber(iva)}</span></div>` : `<div style="font-size:12px;color:#aaa;">${ivaNote}</div>`}
+                        <div class="totals-row total-row"><span>TOTAL:</span><span>${symbol} ${formatNumber(total)}</span></div>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            setTimeout(function() { window.close(); }, 500);
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    </script>
+</body>
+</html>
